@@ -1,0 +1,128 @@
+---
+title: "Machine learning - Prediction Assignment"
+author: "Yoav Pridor"
+date: "19 בנובמבר 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive summary
+
+### Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+### Goal
+
+The goal of this project is to predict the manner in which they did the exercise. 
+
+### Bottom line
+
+The chosen method for classification was Random forest, with an OSE of 0.65%.
+
+## Data preparation
+
+```{r warning=FALSE, message=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(knitr)
+library(dplyr)
+```
+
+
+### Downloading
+Downlowding and prepairing the training set and the test set:
+
+
+```{r cache=TRUE}
+training <- read.csv(url("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv") , na.strings=c("NA","#DIV/0!",""))
+```
+
+###Partitioning
+
+```{r}
+inTrain <- createDataPartition(training$classe, p=0.6, list=FALSE)
+Training_part <- training[inTrain, ]
+Testing_part <- training[-inTrain, ]
+dim(Training_part); dim(Testing_part)
+```
+
+### Subsetting
+
+
+Subsetting to exclude variables which are only measured for new windows (these variables have mostly "NA" values) and also name and timestamp variables:
+
+```{r}
+Training_part1 <- Training_part[,-c(1:7,grep("^kurtosis", names( training )),grep("^skewness", names( training )),grep("^max_", names( training )),grep("^min_", names( training )),grep("^amplitude", names( training )),grep("^var_", names( training )),grep("^avg_", names( training )),grep("^stddev", names( training )))]
+Testing_part1 <- Testing_part[,-c(1:7,grep("^kurtosis", names( training )),grep("^skewness", names( training )),grep("^max_", names( training )),grep("^min_", names( training )),grep("^amplitude", names( training )),grep("^var_", names( training )),grep("^avg_", names( training )),grep("^stddev", names( training )))]
+dim(Training_part1); dim(Testing_part1)
+```
+
+Applying the same transformations to the columns of testing set:
+
+```{r}
+new_col <- colnames(Training_part1[, -53])
+testing1 <- testing[,new_col]
+dim(testing1)
+```
+
+## Cross validation 
+
+```{r}
+set.seed(2308)
+```
+
+
+### Testing Random forest model
+
+```{r cache=TRUE}
+model_rf <- randomForest(classe ~ ., data=Training_part1)
+pred_rf <- predict(model_rf, Testing_part1, type = "class")
+cm_rf <- confusionMatrix(pred_rf, Testing_part1$classe)
+cm_rf
+```
+
+The model accuracy is: 0.9935
+
+### Testing decission tree model
+```{r cache=TRUE}
+model_tree <- rpart(classe ~ ., data=Training_part1, method="class")
+fancyRpartPlot(model_tree)
+```
+
+```{r}
+pred_tree <- predict(model_tree, Testing_part1, type = "class")
+cm_tree <- confusionMatrix(pred_tree, Testing_part1$classe)
+cm_tree
+```
+
+The model accuracy is: 0.7536
+
+
+### Model selection
+
+From the 2 methonds tested the Random Tree method produces the highest Accuracy level. 
+
+Prediction on the test set will be caried out using the Random forest model.
+
+### Expected out of sample error
+
+The expected out of sample error for this prediction is: 
+E(ose) = 100-%Accuracy = 100 - 99.35 = 0.65%
+
+## Prediction for the quiz test set (validation)
+
+```{r}
+pred_val <- predict(model_rf, testing1, type = "class")
+pred_val
+```
+
+
